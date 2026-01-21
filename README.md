@@ -4,6 +4,14 @@ This code was written as part of our bachelor thesis titled: "Reinforcement lear
 
 The RLTCol algorithm works by iteratively running the local search algorithm TabuCol, and running an RL agent. The two components pass solutions to each other. The paper can be read [here](./paper/Paper.pdf).
 
+## Strict RLHO constraints (routing extension)
+
+Any RLHO (RL + SA) routing variant in this repository must follow:
+
+* Each episode is: start solution `s0` → RL perturb for `x` steps → SA search for `y` steps.
+* Training signal includes both step rewards `r_t = C(s_{t-1}) - C(s_t)` and a tail value `V(sx) ≈ C(sx) - C(sx+y)` from SA.
+* RL actions are local moves on the current solution (not constructive full tours/routes).
+
 ## Code
 
 The RL agent is implemented in Python using the [Tianshou](https://github.com/thu-ml/tianshou) library. TabuCol is implemented in Rust, using [maturin](https://github.com/PyO3/maturin) to interface with Python. The code is written for Python 3.10.
@@ -40,6 +48,11 @@ The source code for the RLTCol algorithm is located in the `src` directory. The 
 The RL agent can be trained using the `trainer.py` script. The script takes a number of arguments, which can be found by running `python trainer.py --help`.
 
 The script will save the trained policy to the file specified by the `output` parameter. The policy can then be used to run the RLTCol algorithm.
+
+### Routing RLHO (TSP/CVRP)
+
+The routing RLHO baseline is implemented in `src/routing_trainer.py` and `src/routing_runner.py`.
+Use `python routing_trainer.py --help` and `python routing_runner.py --help` for options.
 
 ### Running the RLTCol algorithm
 

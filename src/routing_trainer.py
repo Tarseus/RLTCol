@@ -58,6 +58,17 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--train-envs", type=int, default=8)
     parser.add_argument("--test-envs", type=int, default=4)
+    parser.add_argument("--buffer-size", type=int, default=50000)
+    parser.add_argument("--batch-size", type=int, default=512)
+    parser.add_argument("--step-per-epoch", type=int, default=50000)
+    parser.add_argument("--step-per-collect", type=int, default=5000)
+    parser.add_argument("--repeat-per-collect", type=int, default=5)
+    parser.add_argument(
+        "--pair-chunk-size",
+        type=int,
+        default=0,
+        help="Split action-pair logits into chunks to reduce GPU memory.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--log-episodes", action="store_true")
     args = parser.parse_args()
@@ -72,6 +83,7 @@ if __name__ == "__main__":
         node_input_dim=node_dim,
         anchor_input_dim=anchor_dim,
         action_pairs=action_pairs,
+        pair_chunk_size=args.pair_chunk_size or None,
         device=device,
     ).to(device)
     critic = RoutingCriticNetwork(node_input_dim=node_dim, device=device).to(device)
@@ -103,7 +115,7 @@ if __name__ == "__main__":
         ]
     )
 
-    replay_buffer = VectorReplayBuffer(50000, len(train_envs))
+    replay_buffer = VectorReplayBuffer(args.buffer_size, len(train_envs))
     train_collector = Collector(policy, train_envs, replay_buffer)
     test_collector = Collector(policy, test_envs)
 
@@ -112,11 +124,11 @@ if __name__ == "__main__":
         train_collector,
         test_collector,
         max_epoch=args.epochs,
-        step_per_epoch=50000,
-        repeat_per_collect=5,
+        step_per_epoch=args.step_per_epoch,
+        repeat_per_collect=args.repeat_per_collect,
         episode_per_test=5,
-        batch_size=512,
-        step_per_collect=5000,
+        batch_size=args.batch_size,
+        step_per_collect=args.step_per_collect,
     )
 
     output_dir = os.path.dirname(args.output)

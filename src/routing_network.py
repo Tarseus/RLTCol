@@ -14,6 +14,7 @@ class PairActorNetwork(nn.Module):
         anchor_input_dim: int,
         action_pairs: np.ndarray,
         embed_dim: int = 64,
+        pair_chunk_size: Optional[int] = None,
         device: str = "cpu",
     ) -> None:
         super().__init__()
@@ -29,6 +30,7 @@ class PairActorNetwork(nn.Module):
             nn.Linear(embed_dim, 1),
         )
         self.device = device
+        self.pair_chunk_size = pair_chunk_size
         self.register_buffer(
             "action_pairs",
             torch.as_tensor(action_pairs.astype(np.int64)),
@@ -52,15 +54,26 @@ class PairActorNetwork(nn.Module):
             action_mask = action_mask.unsqueeze(0)
         node_embed = self.node_mlp(node_features)
         anchor_embed = self.anchor_mlp(anchor_features)
-        node_idx = self.action_pairs[:, 0]
-        anchor_idx = self.action_pairs[:, 1]
-        node_sel = node_embed[:, node_idx, :]
-        anchor_sel = anchor_embed[:, anchor_idx, :]
-        pair_feat = torch.cat([node_sel, anchor_sel, node_sel * anchor_sel], dim=-1)
-        logits = self.pair_mlp(pair_feat).squeeze(-1)
-        for b in range(action_mask.shape[0]):
-            if not action_mask[b].any():
-                action_mask[b] = True
+
+        num_pairs = self.action_pairs.shape[0]
+        chunk_size = self.pair_chunk_size or num_pairs
+        if chunk_size < 1:
+            chunk_size = num_pairs
+        logits_chunks = []
+        for start in range(0, num_pairs, chunk_size):
+            end = min(start + chunk_size, num_pairs)
+            pair_slice = self.action_pairs[start:end]
+            node_idx = pair_slice[:, 0]
+            anchor_idx = pair_slice[:, 1]
+            node_sel = node_embed[:, node_idx, :]
+            anchor_sel = anchor_embed[:, anchor_idx, :]
+            pair_feat = torch.cat([node_sel, anchor_sel, node_sel * anchor_sel], dim=-1)
+            logits_chunks.append(self.pair_mlp(pair_feat).squeeze(-1))
+        logits = torch.cat(logits_chunks, dim=1)
+
+        no_action = ~action_mask.any(dim=1)
+        if no_action.any():
+            action_mask[no_action] = True
         logits = logits.masked_fill(~action_mask, -1e9)
         return logits, state
 

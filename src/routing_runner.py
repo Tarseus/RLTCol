@@ -103,7 +103,7 @@ if __name__ == "__main__":
         critic = RoutingCriticNetwork(node_input_dim=node_dim, device=device).to(device)
         actor_critic = ActorCritic(actor, critic)
         optim = torch.optim.Adam(actor_critic.parameters(), lr=3e-4)
-        dist = torch.distributions.Categorical
+        dist = lambda logits: torch.distributions.Categorical(logits=logits)
         policy = PPOPolicy(
             actor=actor,
             critic=critic,

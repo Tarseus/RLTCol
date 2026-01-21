@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import torch
 from tianshou.data import Collector, VectorReplayBuffer
@@ -118,4 +119,7 @@ if __name__ == "__main__":
         step_per_collect=5000,
     )
 
+    output_dir = os.path.dirname(args.output)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
     torch.save(policy.state_dict(), args.output)

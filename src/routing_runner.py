@@ -4,7 +4,7 @@ import time
 import numpy as np
 import torch
 from tianshou.data import Batch, Collector
-from tianshou.env import DummyVectorEnv
+from tianshou.env import DummyVectorEnv, SubprocVectorEnv
 from tianshou.policy import BasePolicy, PPOPolicy
 from tianshou.utils.net.common import ActorCritic
 
@@ -86,20 +86,34 @@ if __name__ == "__main__":
     parser.add_argument("--sa-stall-steps", type=int, default=0)
     parser.add_argument("--tail-scale", type=float, default=1.0)
     parser.add_argument("--episodes", type=int, default=1)
+    parser.add_argument("--num-envs", type=int, default=1, help="Parallel envs for evaluation")
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     if args.mode in {"rlho", "rl-only"}:
-        env = build_env(args.problem, args, log_episode=True)
         if args.mode == "rl-only":
-            env.sa_steps = 0
-            env.tail_scale = 0.0
-        vector_env = DummyVectorEnv([lambda: env])
-        action_pairs = env.action_pairs
-        node_dim = env.observation_space["node_features"].shape[-1]
-        anchor_dim = env.observation_space["anchor_features"].shape[-1]
+            args.sa_steps = 0
+            args.tail_scale = 0.0
+        def make_env_with_seed(seed, log):
+            env = build_env(args.problem, args, log_episode=log)
+            env.rng = np.random.default_rng(seed)
+            return env
+
+        env_fns = [
+            (lambda s=seed: make_env_with_seed(s, log=False))
+            for seed in range(args.seed, args.seed + args.num_envs)
+        ]
+        vector_env = (
+            SubprocVectorEnv(env_fns)
+            if args.num_envs > 1
+            else DummyVectorEnv(env_fns)
+        )
+        sample_env = build_env(args.problem, args, log_episode=False)
+        action_pairs = sample_env.action_pairs
+        node_dim = sample_env.observation_space["node_features"].shape[-1]
+        anchor_dim = sample_env.observation_space["anchor_features"].shape[-1]
         actor = PairActorNetwork(
             node_input_dim=node_dim,
             anchor_input_dim=anchor_dim,
@@ -115,18 +129,34 @@ if __name__ == "__main__":
             critic=critic,
             optim=optim,
             dist_fn=dist,
-            action_space=env.action_space,
+            action_space=sample_env.action_space,
         )
         if args.policy is None:
-            policy = RandomPolicy(action_space=env.action_space)
+            policy = RandomPolicy(action_space=sample_env.action_space)
         else:
             policy.load_state_dict(torch.load(args.policy, map_location=device))
         policy.eval()
         collector = Collector(policy, vector_env)
         collector.reset()
-        for _ in range(args.episodes):
-            collector.collect(n_episode=1)
-        print("Last episode stats:", env.last_episode_info)
+        result = collector.collect(n_episode=args.episodes)
+        infos = result.get("infos", [])
+        stats = [info.get("episode_stats") for info in infos if info and "episode_stats" in info]
+        if stats:
+            def mean(key):
+                return float(np.mean([s[key] for s in stats]))
+            print(
+                {
+                    "episodes": len(stats),
+                    "mean_cost_s0": mean("cost_s0"),
+                    "mean_cost_sx": mean("cost_sx"),
+                    "mean_cost_sxy": mean("cost_sxy"),
+                    "mean_tail_improve": mean("tail_improve"),
+                    "mean_sa_accept_rate": mean("sa_accept_rate"),
+                    "mean_sa_time": mean("sa_time"),
+                    "mean_total_time": mean("total_time"),
+                    "mean_sa_time_ratio": mean("sa_time_ratio"),
+                }
+            )
         raise SystemExit(0)
 
     if args.problem == "tsp":

@@ -1,5 +1,6 @@
 import argparse
 import time
+from time import perf_counter
 
 import numpy as np
 import torch
@@ -87,6 +88,12 @@ if __name__ == "__main__":
     parser.add_argument("--tail-scale", type=float, default=1.0)
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--num-envs", type=int, default=1, help="Parallel envs for evaluation")
+    parser.add_argument(
+        "--log-interval",
+        type=int,
+        default=0,
+        help="Print progress every N episodes (0 disables progress logging)",
+    )
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
@@ -138,9 +145,31 @@ if __name__ == "__main__":
         policy.eval()
         collector = Collector(policy, vector_env)
         collector.reset()
-        result = collector.collect(n_episode=args.episodes)
-        infos = result.get("infos", [])
-        stats = [info.get("episode_stats") for info in infos if info and "episode_stats" in info]
+        stats = []
+        episodes_done = 0
+        start_time = perf_counter()
+        while episodes_done < args.episodes:
+            batch = args.episodes if args.log_interval <= 0 else args.log_interval
+            n = min(batch, args.episodes - episodes_done)
+            result = collector.collect(n_episode=n)
+            infos = result.get("infos", [])
+            stats.extend(
+                [info.get("episode_stats") for info in infos if info and "episode_stats" in info]
+            )
+            episodes_done = len(stats)
+            if args.log_interval > 0:
+                elapsed = perf_counter() - start_time
+                rate = episodes_done / elapsed if elapsed > 0 else 0.0
+                eta = (args.episodes - episodes_done) / rate if rate > 0 else 0.0
+                if episodes_done > 0:
+                    mean_cost = float(np.mean([s["cost_sxy"] for s in stats]))
+                    mean_tail = float(np.mean([s["tail_improve"] for s in stats]))
+                    print(
+                        f"[progress] {episodes_done}/{args.episodes} "
+                        f"mean_cost_sxy={mean_cost:.4f} mean_tail={mean_tail:.4f} "
+                        f"elapsed={elapsed:.1f}s eta={eta:.1f}s",
+                        flush=True,
+                    )
         if stats:
             def mean(key):
                 return float(np.mean([s[key] for s in stats]))

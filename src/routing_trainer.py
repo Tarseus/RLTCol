@@ -22,6 +22,8 @@ def make_env(problem, args, seed, log_episode=False):
             rl_steps=args.rl_steps,
             sa_steps=args.sa_steps,
             sa_schedule=schedule,
+            sa_converge=args.sa_converge,
+            sa_stall_steps=args.sa_stall_steps,
             seed=seed,
             tail_scale=args.tail_scale,
             log_episode=log_episode,
@@ -33,6 +35,8 @@ def make_env(problem, args, seed, log_episode=False):
             rl_steps=args.rl_steps,
             sa_steps=args.sa_steps,
             sa_schedule=schedule,
+            sa_converge=args.sa_converge,
+            sa_stall_steps=args.sa_stall_steps,
             seed=seed,
             tail_scale=args.tail_scale,
             log_episode=log_episode,
@@ -54,6 +58,8 @@ if __name__ == "__main__":
     parser.add_argument("--sa-steps", type=int, default=200, help="SA steps y")
     parser.add_argument("--sa-t0", type=float, default=1.0, help="SA initial temperature")
     parser.add_argument("--sa-alpha", type=float, default=0.995, help="SA decay rate")
+    parser.add_argument("--sa-converge", action="store_true", help="Run SA until convergence within max steps")
+    parser.add_argument("--sa-stall-steps", type=int, default=0, help="Stop SA after N non-improving steps")
     parser.add_argument("--tail-scale", type=float, default=1.0, help="Tail reward scale")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--train-envs", type=int, default=8)

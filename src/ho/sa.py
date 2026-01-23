@@ -19,13 +19,19 @@ class SASchedule:
 def run_sa(
     instance,
     solution_start,
-    steps: int,
+    steps: Optional[int],
     schedule: SASchedule,
     move_operator: MoveOperator,
     rng: Optional[np.random.Generator] = None,
+    max_steps: Optional[int] = None,
+    stall_steps: int = 0,
 ) -> tuple[Any, float, Dict[str, float]]:
     if rng is None:
         rng = np.random.default_rng()
+    if steps is None:
+        if max_steps is None:
+            raise ValueError("max_steps must be set when steps is None.")
+        steps = max_steps
     current = solution_start.copy()
     best = current.copy()
     best_cost = float(current.cost)
@@ -33,6 +39,7 @@ def run_sa(
     deltas = []
     t = float(schedule.t0)
     start_time = perf_counter()
+    no_improve = 0
     for _ in range(steps):
         move = move_operator.sample(current, rng)
         if not move_operator.is_legal(current, move):
@@ -47,8 +54,17 @@ def run_sa(
             if current.cost < best_cost:
                 best = current.copy()
                 best_cost = float(current.cost)
+                no_improve = 0
+            else:
+                no_improve += 1
+        else:
+            no_improve += 1
         deltas.append(delta)
         t = max(schedule.t_min, t * schedule.alpha)
+        if t <= schedule.t_min:
+            break
+        if stall_steps > 0 and no_improve >= stall_steps:
+            break
     elapsed = perf_counter() - start_time
     avg_delta = float(np.mean(deltas)) if deltas else 0.0
     accept_rate = float(accepted / max(1, steps))

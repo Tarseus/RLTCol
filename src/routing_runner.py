@@ -50,6 +50,8 @@ def build_env(problem, args, log_episode=False):
             rl_steps=args.rl_steps,
             sa_steps=args.sa_steps,
             sa_schedule=schedule,
+            sa_converge=args.sa_converge,
+            sa_stall_steps=args.sa_stall_steps,
             seed=args.seed,
             tail_scale=args.tail_scale,
             log_episode=log_episode,
@@ -60,6 +62,8 @@ def build_env(problem, args, log_episode=False):
         rl_steps=args.rl_steps,
         sa_steps=args.sa_steps,
         sa_schedule=schedule,
+        sa_converge=args.sa_converge,
+        sa_stall_steps=args.sa_stall_steps,
         seed=args.seed,
         tail_scale=args.tail_scale,
         log_episode=log_episode,
@@ -78,6 +82,8 @@ if __name__ == "__main__":
     parser.add_argument("--sa-steps", type=int, default=200)
     parser.add_argument("--sa-t0", type=float, default=1.0)
     parser.add_argument("--sa-alpha", type=float, default=0.995)
+    parser.add_argument("--sa-converge", action="store_true")
+    parser.add_argument("--sa-stall-steps", type=int, default=0)
     parser.add_argument("--tail-scale", type=float, default=1.0)
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--seed", type=int, default=42)
@@ -161,7 +167,13 @@ if __name__ == "__main__":
     start_cost = float(solution.cost if args.problem == "tsp" else solution.total_cost)
     start = time.time()
     best, best_cost, stats = run_sa(
-        instance, solution, args.sa_steps, schedule, move_operator
+        instance,
+        solution,
+        None if args.sa_converge else args.sa_steps,
+        schedule,
+        move_operator,
+        max_steps=args.sa_steps if args.sa_converge else None,
+        stall_steps=args.sa_stall_steps,
     )
     elapsed = time.time() - start
     print(

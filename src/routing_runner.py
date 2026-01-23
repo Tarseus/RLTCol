@@ -112,7 +112,12 @@ def build_policy(action_pairs, node_dim, anchor_dim, action_space, device, polic
         action_space=action_space,
     )
     if policy_path:
-        policy.load_state_dict(torch.load(policy_path, map_location=device))
+        state = torch.load(policy_path, map_location=device)
+        if isinstance(state, dict):
+            state = {
+                k: v for k, v in state.items() if not k.endswith("action_pairs")
+            }
+        policy.load_state_dict(state, strict=False)
     return policy
 
 
@@ -354,7 +359,10 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=42)
     args = parser.parse_args()
 
+    wall_start = perf_counter()
     if args.mode in {"rlho", "rl-only"}:
         eval_rlho(args)
     else:
         eval_sa_only(args)
+    wall_elapsed = perf_counter() - wall_start
+    print({"wall_time_sec": float(wall_elapsed)}, flush=True)

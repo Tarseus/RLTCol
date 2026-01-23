@@ -191,10 +191,32 @@ def eval_rlho(args):
         n = min(batch, args.episodes - episodes_done)
         result = collector.collect(n_episode=n)
         infos = result.get("infos", [])
+        flat_infos = []
+        for info in infos:
+            if isinstance(info, (list, tuple)):
+                flat_infos.extend(info)
+            else:
+                flat_infos.append(info)
         stats.extend(
-            [info["episode_stats"] for info in infos if info and "episode_stats" in info]
+            [
+                info["episode_stats"]
+                for info in flat_infos
+                if info and "episode_stats" in info
+            ]
         )
-        episodes_done = len(stats)
+        episodes_in_batch = 0
+        for key in ("n/ep", "n_episode", "n_ep", "n_episodes"):
+            if key in result:
+                try:
+                    episodes_in_batch = int(result[key])
+                except (TypeError, ValueError):
+                    episodes_in_batch = 0
+                break
+        if episodes_in_batch == 0:
+            episodes_in_batch = sum(
+                1 for info in flat_infos if info and "episode_stats" in info
+            )
+        episodes_done += episodes_in_batch
         if args.log_interval > 0:
             elapsed = perf_counter() - start_time
             rate = episodes_done / elapsed if elapsed > 0 else 0.0

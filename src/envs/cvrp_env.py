@@ -35,6 +35,7 @@ class CvrpEnv(gym.Env):
         sa_schedule: Optional[SASchedule] = None,
         sa_converge: bool = False,
         sa_stall_steps: int = 0,
+        sa_log_interval: int = 0,
         seed: Optional[int] = None,
         initial_solution: str = "random",
         tail_scale: float = 1.0,
@@ -48,6 +49,7 @@ class CvrpEnv(gym.Env):
         self.sa_schedule = sa_schedule or SASchedule(t0=1.0, alpha=0.995)
         self.sa_converge = sa_converge
         self.sa_stall_steps = sa_stall_steps
+        self.sa_log_interval = sa_log_interval
         self.initial_solution = initial_solution
         self.tail_scale = float(tail_scale)
         self.log_episode = log_episode
@@ -161,6 +163,8 @@ class CvrpEnv(gym.Env):
                     rng=self.rng,
                     max_steps=self.sa_steps if self.sa_converge else None,
                     stall_steps=self.sa_stall_steps,
+                    log_interval=self.sa_log_interval,
+                    log_prefix="CVRP",
                 )
                 self.solution = best
                 tail_improve = float(cost_sx - best_cost)

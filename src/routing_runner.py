@@ -53,6 +53,7 @@ def build_env(problem, args, log_episode=False):
             sa_schedule=schedule,
             sa_converge=args.sa_converge,
             sa_stall_steps=args.sa_stall_steps,
+            sa_log_interval=args.sa_log_interval,
             seed=args.seed,
             tail_scale=args.tail_scale,
             log_episode=log_episode,
@@ -65,6 +66,7 @@ def build_env(problem, args, log_episode=False):
         sa_schedule=schedule,
         sa_converge=args.sa_converge,
         sa_stall_steps=args.sa_stall_steps,
+        sa_log_interval=args.sa_log_interval,
         seed=args.seed,
         tail_scale=args.tail_scale,
         log_episode=log_episode,
@@ -85,6 +87,12 @@ if __name__ == "__main__":
     parser.add_argument("--sa-alpha", type=float, default=0.995)
     parser.add_argument("--sa-converge", action="store_true")
     parser.add_argument("--sa-stall-steps", type=int, default=0)
+    parser.add_argument(
+        "--sa-log-interval",
+        type=int,
+        default=0,
+        help="Print SA progress every N SA steps (0 disables)",
+    )
     parser.add_argument("--tail-scale", type=float, default=1.0)
     parser.add_argument("--episodes", type=int, default=1)
     parser.add_argument("--num-envs", type=int, default=1, help="Parallel envs for evaluation")
@@ -233,6 +241,8 @@ if __name__ == "__main__":
         move_operator,
         max_steps=args.sa_steps if args.sa_converge else None,
         stall_steps=args.sa_stall_steps,
+        log_interval=args.sa_log_interval,
+        log_prefix="SA",
     )
     elapsed = time.time() - start
     print(

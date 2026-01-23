@@ -190,21 +190,7 @@ def eval_rlho(args):
         batch = args.episodes if args.log_interval <= 0 else args.log_interval
         n = min(batch, args.episodes - episodes_done)
         result = collector.collect(n_episode=n)
-        infos = result.get("infos", [])
-        flat_infos = []
-        for info in infos:
-            if isinstance(info, (list, tuple)):
-                flat_infos.extend(info)
-            else:
-                flat_infos.append(info)
         stats_before = len(stats)
-        stats.extend(
-            [
-                info["episode_stats"]
-                for info in flat_infos
-                if info and "episode_stats" in info
-            ]
-        )
         episodes_in_batch = 0
         for key in ("n/ep", "n_episode", "n_ep", "n_episodes"):
             if key in result:
@@ -213,25 +199,23 @@ def eval_rlho(args):
                 except (TypeError, ValueError):
                     episodes_in_batch = 0
                 break
+        if hasattr(vector_env, "get_env_attr"):
+            buffers = vector_env.get_env_attr("episode_stats_buffer")
+            for env_id, buffer in enumerate(buffers):
+                if buffer:
+                    stats.extend(buffer)
+                    if hasattr(vector_env, "set_env_attr"):
+                        vector_env.set_env_attr("episode_stats_buffer", [], env_id)
+        elif hasattr(vector_env, "envs"):
+            for env in vector_env.envs:
+                buffer = getattr(env, "episode_stats_buffer", None)
+                if buffer:
+                    stats.extend(buffer)
+                    env.episode_stats_buffer = []
+
+        new_stats = len(stats) - stats_before
         if episodes_in_batch == 0:
-            episodes_in_batch = sum(
-                1 for info in flat_infos if info and "episode_stats" in info
-            )
-        if len(stats) - stats_before < episodes_in_batch:
-            env_infos = []
-            if hasattr(vector_env, "get_env_attr"):
-                env_infos = vector_env.get_env_attr("last_episode_info")
-            elif hasattr(vector_env, "get_attr"):
-                env_infos = vector_env.get_attr("last_episode_info")
-            elif hasattr(vector_env, "envs"):
-                env_infos = [
-                    getattr(env, "last_episode_info", None) for env in vector_env.envs
-                ]
-            for info in env_infos:
-                if len(stats) - stats_before >= episodes_in_batch:
-                    break
-                if info:
-                    stats.append(info)
+            episodes_in_batch = new_stats
         episodes_done += episodes_in_batch
         if args.log_interval > 0:
             elapsed = perf_counter() - start_time

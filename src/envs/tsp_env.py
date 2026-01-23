@@ -87,6 +87,7 @@ class TspEnv(gym.Env):
         self.sum_step_reward = 0.0
         self.cost_s0 = 0.0
         self.last_episode_info = None
+        self.episode_stats_buffer = []
         self.episode_start_time = 0.0
 
     def reset(self, seed: Optional[int] = None, options: Optional[dict] = None):
@@ -175,6 +176,7 @@ class TspEnv(gym.Env):
             }
             info["episode_stats"] = episode_info
             self.last_episode_info = episode_info
+            self.episode_stats_buffer.append(episode_info)
             if self.log_episode:
                 print(
                     "RLHO episode:",

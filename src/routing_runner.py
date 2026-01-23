@@ -197,6 +197,7 @@ def eval_rlho(args):
                 flat_infos.extend(info)
             else:
                 flat_infos.append(info)
+        stats_before = len(stats)
         stats.extend(
             [
                 info["episode_stats"]
@@ -216,6 +217,21 @@ def eval_rlho(args):
             episodes_in_batch = sum(
                 1 for info in flat_infos if info and "episode_stats" in info
             )
+        if len(stats) - stats_before < episodes_in_batch:
+            env_infos = []
+            if hasattr(vector_env, "get_env_attr"):
+                env_infos = vector_env.get_env_attr("last_episode_info")
+            elif hasattr(vector_env, "get_attr"):
+                env_infos = vector_env.get_attr("last_episode_info")
+            elif hasattr(vector_env, "envs"):
+                env_infos = [
+                    getattr(env, "last_episode_info", None) for env in vector_env.envs
+                ]
+            for info in env_infos:
+                if len(stats) - stats_before >= episodes_in_batch:
+                    break
+                if info:
+                    stats.append(info)
         episodes_done += episodes_in_batch
         if args.log_interval > 0:
             elapsed = perf_counter() - start_time

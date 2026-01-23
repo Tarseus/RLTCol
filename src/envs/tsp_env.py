@@ -37,6 +37,8 @@ class TspEnv(gym.Env):
         sa_converge: bool = False,
         sa_stall_steps: int = 0,
         sa_log_interval: int = 0,
+        env_id: int = 0,
+        sa_log_only_env: Optional[int] = None,
         seed: Optional[int] = None,
         initial_solution: str = "random",
         tail_scale: float = 1.0,
@@ -49,6 +51,8 @@ class TspEnv(gym.Env):
         self.sa_converge = sa_converge
         self.sa_stall_steps = sa_stall_steps
         self.sa_log_interval = sa_log_interval
+        self.env_id = env_id
+        self.sa_log_only_env = sa_log_only_env
         self.initial_solution = initial_solution
         self.tail_scale = float(tail_scale)
         self.log_episode = log_episode
@@ -133,6 +137,9 @@ class TspEnv(gym.Env):
                 "time": 0.0,
             }
             if self.sa_steps > 0:
+                log_interval = self.sa_log_interval
+                if self.sa_log_only_env is not None and self.env_id != self.sa_log_only_env:
+                    log_interval = 0
                 best, best_cost, sa_stats = run_sa(
                     self.instance,
                     self.solution,
@@ -142,8 +149,8 @@ class TspEnv(gym.Env):
                     rng=self.rng,
                     max_steps=self.sa_steps if self.sa_converge else None,
                     stall_steps=self.sa_stall_steps,
-                    log_interval=self.sa_log_interval,
-                    log_prefix="TSP",
+                    log_interval=log_interval,
+                    log_prefix=f"TSP#{self.env_id}",
                 )
                 self.solution = best
                 tail_improve = float(cost_sx - best_cost)
@@ -161,6 +168,7 @@ class TspEnv(gym.Env):
                 "sa_accept_rate": float(sa_stats["accept_rate"]),
                 "sa_best_improve": float(sa_stats["best_improve"]),
                 "sa_time": float(sa_stats["time"]),
+                "sa_steps": float(sa_stats.get("steps", 0.0)),
                 "rl_time": float(rl_time),
                 "total_time": float(total_time),
                 "sa_time_ratio": float(sa_ratio),
